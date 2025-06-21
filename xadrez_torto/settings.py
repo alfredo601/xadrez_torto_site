@@ -26,7 +26,7 @@ SECRET_KEY = 'django-insecure-k!$79(sb%@20ukv*svn^1-s6f1rd4gfc2orb^od3*y#%ux!@@%
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['xadreztortobr.pythonanywhere.com']
 
 
 # Application definition
@@ -119,18 +119,23 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/' # Já estava aqui, mas é bom revisar. Mantenha apenas UMA vez.
+
+# Este é o diretório onde o 'collectstatic' irá COLETAR os arquivos estáticos para deploy.
+# Ele deve ser um caminho ABSOLUTO para uma pasta DEDICADA para arquivos estáticos no servidor.
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles') # <--- ADICIONE ESTA LINHA!
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-STATIC_URL = 'static/'
+# REMOVA ESTA LINHA DUPLICADA:
+# STATIC_URL = 'static/' 
 
-# --- BLOCO A SER ADICIONADO ---
-# Esta linha diz ao Django para procurar por arquivos estáticos
-# em uma pasta chamada 'static' na raiz do nosso projeto.
+# --- BLOCO A SER ADICIONADO/REVISADO ---
+# STATICFILES_DIRS está correto para arquivos estáticos em pastas 'static'
+# que não são de apps específicos.
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'static'),
 ]
