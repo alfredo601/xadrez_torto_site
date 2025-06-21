@@ -1,0 +1,221 @@
+{% extends 'game/base.html' %}
+
+{% block content %}
+    <h1>Bem-vindo ao Xadrez Torto!</h1>
+
+    {% if user.is_authenticated %}
+        <p>Seu rating atual: <strong>{{ user.profile.rating|floatformat:"0" }}</strong></p>
+        <p>Pronto para jogar?</p>
+        <div style="margin-bottom: 20px;">
+            <a href="{% url 'create_game' %}" style="display: inline-block; padding: 10px 20px; background-color: #4a7530; color: white; text-decoration: none; border-radius: 5px; margin-right: 10px;">
+                Jogar contra o Computador
+            </a>
+            <a href="{% url 'my_games' %}" style="display: inline-block; padding: 10px 20px; background-color: #6a4c93; color: white; text-decoration: none; border-radius: 5px;">
+                📋 Minhas Partidas
+            </a>
+        </div>
+
+        <div style="margin-top: 40px; border-top: 1px solid #444; padding-top: 20px;">
+            <h3>Jogadores Online:</h3>
+            <ul id="online-users-list" style="list-style: none; padding: 0;">
+                <p id="online-users-placeholder">Carregando...</p>
+            </ul>
+        </div>
+
+        <!-- Modal para configurar desafio -->
+        <div id="challenge-config-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); z-index: 1000;">
+            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 10px; text-align: center; color: black; min-width: 300px;">
+                <h3>Configurar Desafio</h3>
+                <p id="challenge-config-message"></p>
+                
+                <div style="margin: 15px 0;">
+                    <label for="time-control" style="display: block; margin-bottom: 5px; font-weight: bold;">Tempo de Jogo:</label>
+                    <select id="time-control" style="padding: 5px; border: 1px solid #ccc; border-radius: 3px; width: 200px;">
+                        <option value="1|0">1 minuto (Bullet)</option>
+                        <option value="3|0">3 minutos (Blitz)</option>
+                        <option value="5|0">5 minutos (Blitz)</option>
+                        <option value="10|0" selected>10 minutos (Rápido)</option>
+                        <option value="15|10">15 + 10 segundos (Rápido)</option>
+                        <option value="30|0">30 minutos (Clássico)</option>
+                    </select>
+                </div>
+                
+                <button id="send-challenge" style="margin: 5px; padding: 10px 20px; background-color: #4a7530; color: white; border: none; border-radius: 5px; cursor: pointer;">Enviar Desafio</button>
+                <button id="cancel-challenge" style="margin: 5px; padding: 10px 20px; background-color: #8b2f2f; color: white; border: none; border-radius: 5px; cursor: pointer;">Cancelar</button>
+            </div>
+        </div>
+
+        <!-- Modal para desafio recebido -->
+        <div id="challenge-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); z-index: 1000;">
+            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 10px; text-align: center; color: black;">
+                <h3>Desafio Recebido!</h3>
+                <p id="challenge-message"></p>
+                <p id="challenge-time-info" style="font-weight: bold; color: #4a7530; margin: 10px 0;"></p>
+                <button id="accept-challenge" style="margin: 5px; padding: 10px 20px; background-color: #4a7530; color: white; border: none; border-radius: 5px; cursor: pointer;">Aceitar</button>
+                <button id="reject-challenge" style="margin: 5px; padding: 10px 20px; background-color: #8b2f2f; color: white; border: none; border-radius: 5px; cursor: pointer;">Rejeitar</button>
+            </div>
+        </div>
+    {% else %}
+        <p>Faça <a href="{% url 'login' %}">login</a> ou <a href="{% url 'register' %}">cadastre-se</a> para começar a jogar.</p>
+    {% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Executa apenas se o usuário estiver logado
+    {% if user.is_authenticated %}
+    
+    const onlineUsersList = document.getElementById('online-users-list');
+    const onlineUsersPlaceholder = document.getElementById('online-users-placeholder');
+    const currentUser = "{{ user.username }}";
+
+    // Cria a conexão WebSocket
+    const presenceSocket = new WebSocket(
+        'ws://' + window.location.host + '/ws/presence/'
+    );
+
+    // O que fazer quando uma mensagem chega do servidor
+    presenceSocket.onmessage = function(e) {
+        const data = JSON.parse(e.data);
+        
+        if (data.type === 'online_users_list') {
+            updateUsersList(data.users);
+        } else if (data.type === 'challenge_received') {
+            showChallengeModal(data.challenger_username, data.challenge_id, data.time_info);
+        } else if (data.type === 'challenge_sent') {
+            alert(data.message);
+        } else if (data.type === 'challenge_rejected') {
+            alert(`${data.challenged_username} rejeitou seu desafio.`);
+        } else if (data.type === 'game_started') {
+            alert(`Jogo iniciado! Você joga de ${data.white_player === currentUser ? 'Brancas' : 'Pretas'}.`);
+            window.location.href = `/game/${data.game_id}/`;
+        } else if (data.type === 'error') {
+            alert(data.message);
+        }
+    };
+
+    // O que fazer quando a conexão fecha (ex: o servidor reinicia)
+    presenceSocket.onclose = function(e) {
+        console.error('Socket de presença fechado inesperadamente');
+        onlineUsersPlaceholder.textContent = 'Conexão perdida. Atualize a página.';
+    };
+
+    // Função para atualizar a lista de usuários no HTML
+    function updateUsersList(users) {
+        // Limpa a lista atual
+        onlineUsersList.innerHTML = ''; 
+        let otherUsersFound = false;
+
+        users.forEach(user => {
+            // Não mostra o próprio usuário na lista
+            if (user.username !== currentUser) {
+                const li = document.createElement('li');
+                li.style.marginBottom = '10px';
+                li.style.display = 'flex';
+                li.style.justifyContent = 'space-between';
+                li.style.alignItems = 'center';
+                li.style.padding = '10px';
+                li.style.backgroundColor = '#2a2a2a';
+                li.style.borderRadius = '5px';
+                
+                const userInfo = document.createElement('span');
+                userInfo.textContent = `${user.username} (Rating: ${user.rating})`;
+                
+                const challengeBtn = document.createElement('button');
+                challengeBtn.textContent = 'Desafiar';
+                challengeBtn.style.padding = '5px 10px';
+                challengeBtn.style.backgroundColor = '#4a7530';
+                challengeBtn.style.color = 'white';
+                challengeBtn.style.border = 'none';
+                challengeBtn.style.borderRadius = '3px';
+                challengeBtn.style.cursor = 'pointer';
+                challengeBtn.onclick = () => challengeUser(user.username);
+                
+                li.appendChild(userInfo);
+                li.appendChild(challengeBtn);
+                onlineUsersList.appendChild(li);
+                otherUsersFound = true;
+            }
+        });
+
+        if (!otherUsersFound) {
+            const p = document.createElement('p');
+            p.textContent = 'Nenhum outro jogador online no momento.';
+            onlineUsersList.appendChild(p);
+        }
+    }
+
+    let challengedUsername = null;
+
+    function challengeUser(username) {
+        challengedUsername = username;
+        document.getElementById('challenge-config-message').textContent = 
+            `Configurar desafio para ${username}:`;
+        document.getElementById('challenge-config-modal').style.display = 'block';
+    }
+
+    function sendChallenge() {
+        const timeControl = document.getElementById('time-control').value;
+        const [minutes, increment] = timeControl.split('|').map(Number);
+        
+        presenceSocket.send(JSON.stringify({
+            'type': 'challenge_user',
+            'challenged_username': challengedUsername,
+            'time_control_minutes': minutes,
+            'time_increment_seconds': increment
+        }));
+        
+        hideChallengeConfigModal();
+    }
+
+    function hideChallengeConfigModal() {
+        document.getElementById('challenge-config-modal').style.display = 'none';
+        challengedUsername = null;
+    }
+
+    let currentChallengeId = null;
+    let currentChallengeTimeInfo = null;
+
+    function showChallengeModal(challengerUsername, challengeId, timeInfo) {
+        currentChallengeId = challengeId;
+        currentChallengeTimeInfo = timeInfo;
+        document.getElementById('challenge-message').textContent = 
+            `${challengerUsername} te desafiou para uma partida!`;
+        
+        if (timeInfo) {
+            const timeText = timeInfo.increment > 0 
+                ? `${timeInfo.minutes} + ${timeInfo.increment} segundos`
+                : `${timeInfo.minutes} minutos`;
+            document.getElementById('challenge-time-info').textContent = 
+                `Tempo: ${timeText}`;
+        }
+        
+        document.getElementById('challenge-modal').style.display = 'block';
+    }
+
+    function hideChallengeModal() {
+        document.getElementById('challenge-modal').style.display = 'none';
+        currentChallengeId = null;
+    }
+
+    function respondToChallenge(response) {
+        if (currentChallengeId) {
+            presenceSocket.send(JSON.stringify({
+                'type': 'respond_challenge',
+                'challenge_id': currentChallengeId,
+                'response': response
+            }));
+            hideChallengeModal();
+        }
+    }
+
+    // Event listeners para os botões dos modais
+    document.getElementById('send-challenge').onclick = sendChallenge;
+    document.getElementById('cancel-challenge').onclick = hideChallengeConfigModal;
+    document.getElementById('accept-challenge').onclick = () => respondToChallenge('accept');
+    document.getElementById('reject-challenge').onclick = () => respondToChallenge('reject');
+
+    {% endif %}
+</script>
+{% endblock %}

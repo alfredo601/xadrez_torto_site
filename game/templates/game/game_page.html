@@ -1,0 +1,1314 @@
+{% extends 'game/base.html' %}
+{% load static %}
+
+{% block content %}
+<style>
+    body {
+        margin: 0;
+        padding: 20px;
+        background: #1a1a1a;
+        color: #fff;
+        font-family: Arial, sans-serif;
+    }
+    
+    #main-container {
+        display: flex;
+        gap: 20px;
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+    
+    #game-container {
+        position: relative;
+        width: 576px; /* Aumentado para acomodar as coordenadas */
+    }
+    #board-wrapper {
+        position: relative;
+        width: 576px;
+        height: 576px;
+    }
+    #board {
+        display: grid;
+        grid-template-columns: repeat(8, 64px);
+        grid-template-rows: repeat(8, 64px);
+        width: 512px;
+        height: 512px;
+        border: 2px solid #5e6672;
+        margin: 32px; /* Espaço para as coordenadas */
+    }
+    
+    /* Coordenadas do tabuleiro */
+    .coord-label {
+        position: absolute;
+        font-weight: bold;
+        font-size: 14px;
+        color: #5e6672;
+        user-select: none;
+    }
+    
+    .coord-file {
+        bottom: 8px;
+        width: 64px;
+        text-align: center;
+    }
+    
+    .coord-rank {
+        left: 8px;
+        height: 64px;
+        display: flex;
+        align-items: center;
+        width: 20px;
+    }
+    
+    /* Estilos para o histórico de movimentos */
+    .replay-btn {
+        background: #4a4a4a;
+        color: #fff;
+        border: none;
+        padding: 8px 12px;
+        margin: 0 3px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 16px;
+        transition: background-color 0.2s;
+    }
+    
+    .replay-btn:hover {
+        background: #5a5a5a;
+    }
+    
+    .replay-btn:disabled {
+        background: #2a2a2a;
+        color: #666;
+        cursor: not-allowed;
+    }
+    
+    .move-item {
+        padding: 5px 10px;
+        margin: 2px 0;
+        border-radius: 3px;
+        cursor: pointer;
+        color: #ccc;
+        font-size: 0.9em;
+        transition: background-color 0.2s;
+    }
+    
+    .move-item:hover {
+        background: #3a3a3a;
+    }
+    
+    .move-item.current {
+        background: #4a6741;
+        color: #fff;
+    }
+    
+    .move-item.white {
+        border-left: 3px solid #f0f0f0;
+    }
+    
+    .move-item.black {
+        border-left: 3px solid #333;
+    }
+
+    /* Orientação do tabuleiro será controlada pela renderização das coordenadas */
+    .square {
+        width: 64px;
+        height: 64px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-sizing: border-box;
+        cursor: pointer;
+    }
+    .square.selected {
+        border: 3px solid #3c82b4;
+    }
+    .square img {
+        width: 85%;
+        height: 85%;
+        pointer-events: none;
+    }
+    #game-over-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.85);
+        color: white;
+        display: none;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        text-align: center;
+        z-index: 1000;
+    }
+    
+    #overlay-content {
+        position: relative;
+        background: #2a2a2a;
+        padding: 30px;
+        border-radius: 15px;
+        border: 2px solid #4a4a4a;
+        max-width: 500px;
+        width: 90%;
+    }
+    
+    .close-overlay {
+        position: absolute;
+        top: 10px;
+        right: 15px;
+        background: none;
+        border: none;
+        color: #ccc;
+        font-size: 24px;
+        cursor: pointer;
+        padding: 0;
+        width: 30px;
+        height: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        transition: all 0.2s;
+    }
+    
+    .close-overlay:hover {
+        background: #4a4a4a;
+        color: #fff;
+    }
+    #game-over-message {
+        font-size: 2em;
+        font-weight: bold;
+    }
+    .game-over-buttons {
+        margin-top: 20px;
+    }
+    .game-over-button {
+        display: inline-block;
+        padding: 12px 24px;
+        margin: 0 10px;
+        background-color: #4a7530;
+        color: white;
+        text-decoration: none;
+        border-radius: 5px;
+        font-size: 1em;
+    }
+    .game-over-button.exit {
+        background-color: #8b2f2f;
+    }
+    /* Painel lateral de movimentos */
+    #move-history-sidebar {
+        width: 300px;
+        background: #2a2a2a;
+        border-radius: 10px;
+        padding: 20px;
+        height: fit-content;
+        max-height: 600px;
+        overflow-y: auto;
+    }
+    
+    #move-history-sidebar h3 {
+        color: #fff;
+        margin-bottom: 15px;
+        text-align: center;
+        border-bottom: 2px solid #4a4a4a;
+        padding-bottom: 10px;
+    }
+    
+    /* Botões PGN */
+    .pgn-controls {
+        margin-top: 15px;
+        padding-top: 15px;
+        border-top: 1px solid #4a4a4a;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+    
+    .pgn-btn {
+        padding: 8px 12px;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 0.9em;
+        transition: background-color 0.3s;
+        text-decoration: none;
+        text-align: center;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 5px;
+    }
+    
+    .pgn-btn-copy {
+        background-color: #6a4c93;
+        color: white;
+    }
+    
+    .pgn-btn-copy:hover {
+        background-color: #7a5ca3;
+    }
+    
+    .pgn-btn-copy.copied {
+        background-color: #4a7530;
+    }
+    
+    .pgn-btn-download {
+        background-color: #c9a96e;
+        color: #333;
+    }
+    
+    .pgn-btn-download:hover {
+        background-color: #d9b97e;
+    }
+    
+    /* Modal PGN */
+    .pgn-modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.8);
+        z-index: 1000;
+    }
+    
+    .pgn-modal-content {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: #2a2a2a;
+        padding: 30px;
+        border-radius: 10px;
+        max-width: 600px;
+        width: 90%;
+        max-height: 80%;
+        overflow-y: auto;
+    }
+    
+    .pgn-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid #4a4a4a;
+    }
+    
+    .close-modal {
+        background: none;
+        border: none;
+        color: #ccc;
+        font-size: 24px;
+        cursor: pointer;
+        padding: 0;
+        width: 30px;
+        height: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        transition: all 0.2s;
+    }
+    
+    .close-modal:hover {
+        background: #4a4a4a;
+        color: #fff;
+    }
+    
+    .pgn-content {
+        background: #1a1a1a;
+        padding: 15px;
+        border-radius: 5px;
+        font-family: 'Courier New', monospace;
+        font-size: 14px;
+        line-height: 1.4;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+        margin-bottom: 20px;
+        max-height: 300px;
+        overflow-y: auto;
+    }
+    
+    .pgn-actions {
+        display: flex;
+        gap: 10px;
+        justify-content: center;
+    }
+    
+    /* Botão de fechar overlay */
+    .close-overlay {
+        position: absolute;
+        top: 15px;
+        right: 20px;
+        background: none;
+        border: none;
+        color: #fff;
+        font-size: 24px;
+        cursor: pointer;
+        width: 30px;
+        height: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        transition: background-color 0.3s;
+    }
+    
+    .close-overlay:hover {
+        background-color: rgba(255, 255, 255, 0.1);
+    }
+    
+    #overlay-content {
+        position: relative;
+        background: rgba(0, 0, 0, 0.9);
+        padding: 40px;
+        border-radius: 15px;
+        text-align: center;
+        max-width: 400px;
+        margin: 0 auto;
+    }
+    
+    /* Controles de reprodução */
+    .replay-btn {
+        background: #4a4a4a;
+        border: none;
+        color: #fff;
+        padding: 8px 12px;
+        margin: 0 3px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 14px;
+        transition: background-color 0.3s;
+    }
+    
+    .replay-btn:hover {
+        background: #6a6a6a;
+    }
+    
+    .replay-btn:disabled {
+        background: #2a2a2a;
+        color: #666;
+        cursor: not-allowed;
+    }
+    
+    /* Lista de movimentos */
+    .move-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 5px 8px;
+        margin: 2px 0;
+        border-radius: 3px;
+        cursor: pointer;
+        transition: background-color 0.2s;
+        font-family: monospace;
+        font-size: 14px;
+    }
+    
+    .move-item:hover {
+        background: #3a3a3a;
+    }
+    
+    .move-item.current {
+        background: #4a7c59;
+        color: #fff;
+    }
+    
+    .move-number {
+        color: #888;
+        font-weight: bold;
+        min-width: 30px;
+    }
+    
+    .move-notation {
+        color: #ccc;
+    }
+</style>
+
+<div id="main-container">
+    <div id="game-container">
+        <h2 id="game-status">Partida de Xadrez Torto</h2>
+        <p id="turn-indicator">
+            {% if is_pvp %}
+                Você joga de {% if player_color == 'w' %}Brancas{% else %}Pretas{% endif %}. 
+                {% if is_my_turn %}É a sua vez.{% else %}Aguardando jogada do oponente...{% endif %}
+            {% else %}
+                Você joga de Brancas. {% if gs.white_to_move %}É a sua vez.{% else %}Aguardando jogada do oponente...{% endif %}
+            {% endif %}
+        </p>
+        
+        <!-- Relógios de Xadrez (apenas para PvP) -->
+        {% if is_pvp %}
+        <div id="chess-clocks" style="display: flex; justify-content: space-between; margin: 15px 0; padding: 10px; background: #2a2a2a; border-radius: 8px;">
+            <div id="white-clock" class="chess-clock" style="flex: 1; text-align: center; padding: 10px; margin: 0 5px; background: #f0f0f0; color: #333; border-radius: 5px; font-weight: bold; font-size: 18px;">
+                <div style="font-size: 14px; margin-bottom: 5px;">Brancas</div>
+                <div id="white-time">--:--</div>
+            </div>
+            <div id="black-clock" class="chess-clock" style="flex: 1; text-align: center; padding: 10px; margin: 0 5px; background: #333; color: #f0f0f0; border-radius: 5px; font-weight: bold; font-size: 18px;">
+                <div style="font-size: 14px; margin-bottom: 5px;">Pretas</div>
+                <div id="black-time">--:--</div>
+            </div>
+        </div>
+        {% endif %}
+
+        <div id="board-wrapper">
+            <div id="board"></div>
+        </div>
+
+        <div id="game-over-overlay">
+            <div id="overlay-content">
+                <button class="close-overlay" onclick="closeGameOverOverlay()">&times;</button>
+                <div id="game-over-message">Fim de Jogo!</div>
+                <div class="game-over-buttons">
+                    {% if not is_pvp %}
+                        <a href="{% url 'create_game' %}" class="game-over-button">Jogar Novamente</a>
+                    {% else %}
+                        <button id="rematch-button" class="game-over-button" onclick="offerRematch()">Oferecer Revanche</button>
+                        <div id="rematch-status" style="margin-top: 10px; font-size: 0.9em; color: #ccc;"></div>
+                    {% endif %}
+                    <a href="{% url 'home' %}" class="game-over-button exit">Voltar ao Início</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Painel lateral de histórico de movimentos -->
+    <div id="move-history-sidebar">
+        <h3>Histórico da Partida</h3>
+        
+        <!-- Controles de reprodução -->
+        <div id="replay-controls" style="text-align: center; margin-bottom: 15px;">
+            <button id="replay-start" class="replay-btn" title="Voltar ao início">⏮</button>
+            <button id="replay-prev" class="replay-btn" title="Movimento anterior">⏪</button>
+            <button id="replay-next" class="replay-btn" title="Próximo movimento">⏩</button>
+            <button id="replay-end" class="replay-btn" title="Ir ao final">⏭</button>
+        </div>
+        
+        <!-- Indicador do movimento atual -->
+        <div id="move-indicator" style="text-align: center; color: #ccc; margin-bottom: 10px; font-size: 0.9em;">
+            Movimento: <span id="current-move-number">0</span> / <span id="total-moves">0</span>
+        </div>
+        
+        <!-- Lista de movimentos -->
+        <div id="move-list" style="max-height: 350px; overflow-y: auto; background: #1a1a1a; border-radius: 5px; padding: 10px;">
+            <!-- Movimentos serão inseridos aqui via JavaScript -->
+        </div>
+        
+        <!-- Controles de PGN -->
+        {% if game_over %}
+        <div class="pgn-controls">
+            <button id="copy-pgn-btn" class="pgn-btn pgn-btn-copy" onclick="showPGNModal()">
+                📋 Ver PGN
+            </button>
+            <a href="{% url 'generate_pgn' game.id %}?download=true" class="pgn-btn pgn-btn-download">
+                💾 Baixar PGN
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Modal para exibir PGN -->
+<div id="pgn-modal" class="pgn-modal">
+    <div class="pgn-modal-content">
+        <div class="pgn-header">
+            <h3>PGN da Partida</h3>
+            <button class="close-modal" onclick="closePGNModal()">×</button>
+        </div>
+        <div id="pgn-content" class="pgn-content"></div>
+        <div class="pgn-actions">
+            <button id="copy-pgn-text-btn" class="pgn-btn pgn-btn-copy" onclick="copyPGNText()">📋 Copiar PGN</button>
+        </div>
+    </div>
+</div>
+
+
+
+    <!-- Modal para coroação de peão -->
+    <div id="promotion-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.75); z-index: 1000;">
+        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 10px; text-align: center; color: black;">
+            <h3>Escolha uma peça para coroação:</h3>
+            <div style="display: flex; justify-content: center; gap: 10px; margin-top: 15px;">
+                <button class="promotion-piece" data-piece="Q" style="padding: 10px; border: none; background: #f0f0f0; cursor: pointer; border-radius: 5px;">
+                    <img src="{{ image_paths.wQ }}" style="width: 40px; height: 40px;" alt="Rainha">
+                    <br>Rainha
+                </button>
+                <button class="promotion-piece" data-piece="R" style="padding: 10px; border: none; background: #f0f0f0; cursor: pointer; border-radius: 5px;">
+                    <img src="{{ image_paths.wR }}" style="width: 40px; height: 40px;" alt="Torre">
+                    <br>Torre
+                </button>
+                <button class="promotion-piece" data-piece="B" style="padding: 10px; border: none; background: #f0f0f0; cursor: pointer; border-radius: 5px;">
+                    <img src="{{ image_paths.wB }}" style="width: 40px; height: 40px;" alt="Bispo">
+                    <br>Bispo
+                </button>
+                <button class="promotion-piece" data-piece="N" style="padding: 10px; border: none; background: #f0f0f0; cursor: pointer; border-radius: 5px;">
+                    <img src="{{ image_paths.wN }}" style="width: 40px; height: 40px;" alt="Cavalo">
+                    <br>Cavalo
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{ gs.vision_board|json_script:"vision-board-data" }}
+{{ image_paths|json_script:"image-paths-data" }}
+{{ game.id|json_script:"game-id-data" }}
+{{ gs.game_over|json_script:"game-over-initial-data" }}
+{{ gs.winner|json_script:"winner-initial-data" }}
+{{ player_color|json_script:"player-color-data" }}
+{{ is_pvp|json_script:"is-pvp-data" }}
+
+<script>
+    // ===================================================================
+    // SEÇÃO 1: DECLARAÇÃO DE VARIÁVEIS E CONSTANTES
+    // ===================================================================
+    const boardElement = document.getElementById('board');
+    const turnIndicator = document.getElementById('turn-indicator');
+    const gameOverOverlay = document.getElementById('game-over-overlay');
+    const gameOverMessage = document.getElementById('game-over-message');
+    
+    const gameId = JSON.parse(document.getElementById('game-id-data').textContent);
+    const pieceImages = JSON.parse(document.getElementById('image-paths-data').textContent);
+    const isGameOverInitially = JSON.parse(document.getElementById('game-over-initial-data').textContent);
+    const winnerInitially = JSON.parse(document.getElementById('winner-initial-data').textContent);
+    
+    // Variáveis para o histórico de movimentos
+    let moveHistory = [];
+    let currentMoveIndex = -1;
+    let isReplayMode = false;
+    const moveHistoryPanel = document.getElementById('move-history-sidebar');
+    const moveList = document.getElementById('move-list');
+    const currentMoveNumber = document.getElementById('current-move-number');
+    const totalMoves = document.getElementById('total-moves');
+    const replayButtons = {
+        start: document.getElementById('replay-start'),
+        prev: document.getElementById('replay-prev'),
+        next: document.getElementById('replay-next'),
+        end: document.getElementById('replay-end')
+    };
+    const playerColor = JSON.parse(document.getElementById('player-color-data').textContent);
+    const isPvP = JSON.parse(document.getElementById('is-pvp-data').textContent);
+    
+    let visionBoard = JSON.parse(document.getElementById('vision-board-data').textContent);
+    let selectedSquare = null;
+    let pendingPromotion = null;
+    let gameSocket = null;
+    
+    // Variáveis dos relógios de xadrez
+    let whiteTimeLeft = 0; // em segundos
+    let blackTimeLeft = 0; // em segundos
+    let timeIncrement = 0; // em segundos
+    let clockInterval = null;
+    let currentTurn = 'w'; // 'w' para brancas, 'b' para pretas
+    let lastMoveTime = null;
+    
+    // Conectar WebSocket para jogos PVP
+    if (isPvP) {
+        const wsScheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
+        const wsPath = `${wsScheme}://${window.location.host}/ws/pvp/game/${gameId}/`;
+        gameSocket = new WebSocket(wsPath);
+        
+        gameSocket.onmessage = function(e) {
+            const data = JSON.parse(e.data);
+            
+            if (data.type === 'move_update') {
+                // Atualizar o tabuleiro quando o oponente fizer uma jogada
+                visionBoard = data.move_data.vision_board;
+                drawBoard();
+                
+                // Atualizar relógios se disponível
+                if (data.move_data.white_time_left !== undefined) {
+                    whiteTimeLeft = data.move_data.white_time_left;
+                }
+                if (data.move_data.black_time_left !== undefined) {
+                    blackTimeLeft = data.move_data.black_time_left;
+                }
+                if (data.move_data.turn) {
+                    switchTurn();
+                }
+                
+                if (data.move_data.is_game_over) {
+                    stopClock();
+                    showGameOver(data.move_data.winner);
+                } else {
+                    const isMyTurn = (playerColor === 'w' && data.move_data.turn === 'w') || 
+                                    (playerColor === 'b' && data.move_data.turn === 'b');
+                    turnIndicator.textContent = isMyTurn ? 'É a sua vez.' : 'Aguardando jogada do oponente...';
+                }
+            } else if (data.type === 'player_connected') {
+                console.log(`${data.user} se conectou ao jogo.`);
+            } else if (data.type === 'player_disconnected') {
+                console.log(`${data.user} se desconectou do jogo.`);
+            } else if (data.type === 'rematch_offered') {
+                handleRematchOffer(data.challenger_username);
+            } else if (data.type === 'rematch_accepted') {
+                handleRematchAccepted(data.new_game_id);
+            } else if (data.type === 'rematch_declined') {
+                handleRematchDeclined();
+            }
+        };
+        
+        gameSocket.onopen = function(e) {
+            console.log('WebSocket conectado com sucesso');
+        };
+        
+        gameSocket.onerror = function(e) {
+            console.error('Erro no WebSocket:', e);
+            turnIndicator.textContent = 'Erro de conexão. Recarregue a página.';
+        };
+        
+        gameSocket.onclose = function(e) {
+            console.error('WebSocket do jogo foi fechado inesperadamente');
+            if (e.code !== 1000) {
+                turnIndicator.textContent = 'Conexão perdida. Recarregue a página.';
+            }
+        };
+    }
+
+    const colors = {
+        'visible_light': "#e8e8ff", 'visible_dark':  "#afc2d7",
+        'hidden_light':  "#828c9b", 'hidden_dark':   "#5e6672",
+        'blocked':       "#8f5656"
+    };
+
+    // ===================================================================
+    // SEÇÃO 2: DEFINIÇÃO DAS FUNÇÕES
+    // ===================================================================
+
+    function drawBoard() {
+        const boardWrapper = document.getElementById('board-wrapper');
+        const boardElement = document.getElementById('board');
+        
+        // Limpar coordenadas existentes
+        boardWrapper.querySelectorAll('.coord-label').forEach(el => el.remove());
+        boardElement.innerHTML = '';
+        
+        // Definir ordem das coordenadas baseada na orientação do jogador
+        const files = playerColor === 'b' ? ['h', 'g', 'f', 'e', 'd', 'c', 'b', 'a'] : ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+        const ranks = playerColor === 'b' ? ['1', '2', '3', '4', '5', '6', '7', '8'] : ['8', '7', '6', '5', '4', '3', '2', '1'];
+        
+        // Adicionar labels das colunas (files)
+        files.forEach((file, index) => {
+            const label = document.createElement('div');
+            label.className = 'coord-label coord-file';
+            label.textContent = file;
+            label.style.left = `${32 + index * 64}px`;
+            boardWrapper.appendChild(label);
+        });
+        
+        // Adicionar labels das linhas (ranks)
+        ranks.forEach((rank, index) => {
+            const label = document.createElement('div');
+            label.className = 'coord-label coord-rank';
+            label.textContent = rank;
+            label.style.top = `${32 + index * 64}px`;
+            boardWrapper.appendChild(label);
+        });
+        
+        // Para jogadores de peças pretas, renderiza o tabuleiro invertido (como no Lichess)
+        // Linhas: 7,6,5,4,3,2,1,0 (de cima para baixo na tela)
+        // Colunas: 7,6,5,4,3,2,1,0 (da esquerda para direita na tela)
+        const startRow = playerColor === 'b' ? 7 : 0;
+        const endRow = playerColor === 'b' ? -1 : 8;
+        const rowStep = playerColor === 'b' ? -1 : 1;
+        
+        for (let r = startRow; r !== endRow; r += rowStep) {
+            const startCol = playerColor === 'b' ? 7 : 0;
+            const endCol = playerColor === 'b' ? -1 : 8;
+            const colStep = playerColor === 'b' ? -1 : 1;
+            
+            for (let c = startCol; c !== endCol; c += colStep) {
+                const square = document.createElement('div');
+                square.classList.add('square');
+                
+                square.dataset.row = r;  // Coordenadas reais do tabuleiro
+                square.dataset.col = c;
+                const visionStatus = visionBoard[r][c];
+                const isLightSquare = (r + c) % 2 === 0;
+                let color;
+                if (visionStatus === '??') {
+                    color = isLightSquare ? colors.hidden_light : colors.hidden_dark;
+                } else if (visionStatus === 'XX') {
+                    color = colors.blocked;
+                } else {
+                    color = isLightSquare ? colors.visible_light : colors.visible_dark;
+                }
+                square.style.backgroundColor = color;
+                if (pieceImages[visionStatus]) {
+                    const pieceImg = document.createElement('img');
+                    pieceImg.src = pieceImages[visionStatus];
+                    square.appendChild(pieceImg);
+                }
+                boardElement.appendChild(square);
+            }
+        }
+    }
+
+    function showGameOver(winner) {
+        if (winner) {
+            gameOverMessage.textContent = `Fim de Jogo! Vencedor: ${winner}`;
+        } else {
+            gameOverMessage.textContent = 'Fim de Jogo!';
+        }
+        gameOverOverlay.style.display = 'flex';
+        turnIndicator.textContent = 'A partida terminou.';
+        boardElement.removeEventListener('click', handleBoardClick);
+        
+        // Mostrar botões de PGN quando o jogo terminar
+        const pgnControls = document.querySelector('.pgn-controls');
+        if (!pgnControls) {
+            // Criar os botões de PGN se não existirem
+            const moveHistoryPanel = document.getElementById('move-history-sidebar');
+            const pgnControlsDiv = document.createElement('div');
+            pgnControlsDiv.className = 'pgn-controls';
+            pgnControlsDiv.innerHTML = `
+                <button id="copy-pgn-btn" class="pgn-btn pgn-btn-copy" onclick="showPGNModal()">
+                    📋 Ver PGN
+                </button>
+                <a href="/game/${gameId}/pgn/?download=true" class="pgn-btn pgn-btn-download">
+                    💾 Baixar PGN
+                </a>
+            `;
+            moveHistoryPanel.appendChild(pgnControlsDiv);
+        } else {
+            pgnControls.style.display = 'block';
+        }
+        
+        // Carregar e exibir o histórico de movimentos
+        loadMoveHistory();
+    }
+    
+    function closeGameOverOverlay() {
+        gameOverOverlay.style.display = 'none';
+    }
+
+    async function sendMoveToServer(startPos, endPos, promotionPiece = null) {
+        turnIndicator.textContent = 'Processando jogada...';
+        const csrfToken = getCookie('csrftoken');
+
+        const requestBody = { start: startPos, end: endPos };
+        if (promotionPiece) {
+            requestBody.promotion_piece = promotionPiece;
+        }
+
+        try {
+            const response = await fetch(`/game/${gameId}/move/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                body: JSON.stringify(requestBody)
+            });
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || 'Erro no servidor.');
+            }
+            const data = await response.json();
+            
+            if (data.status === 'promotion_required') {
+                // Mostra modal de coroação
+                pendingPromotion = { startPos, endPos };
+                document.getElementById('promotion-modal').style.display = 'block';
+                turnIndicator.textContent = 'Escolha uma peça para coroação.';
+            } else if (data.status === 'success') {
+                 visionBoard = data.vision_board;
+                 drawBoard();
+                 
+                 // Atualizar relógios para jogos PvP
+                 if (isPvP) {
+                     // Atualizar tempos se fornecidos pelo servidor
+                     if (data.white_time_left !== undefined) {
+                         whiteTimeLeft = data.white_time_left;
+                     }
+                     if (data.black_time_left !== undefined) {
+                         blackTimeLeft = data.black_time_left;
+                     }
+                     
+                     // Trocar turno e adicionar incremento
+                     switchTurn();
+                 }
+                 
+                 // Enviar atualização via WebSocket para jogos PVP
+                 if (isPvP && gameSocket) {
+                     gameSocket.send(JSON.stringify({
+                         type: 'move_made',
+                         move_data: {
+                             vision_board: data.vision_board,
+                             turn: data.turn,
+                             is_game_over: data.is_game_over,
+                             winner: data.winner,
+                             white_time_left: whiteTimeLeft,
+                             black_time_left: blackTimeLeft
+                         }
+                     }));
+                 }
+                 
+                 if (data.is_game_over) {
+                     stopClock();
+                     showGameOver(data.winner);
+                 } else {
+                     if (isPvP) {
+                         const isMyTurn = (playerColor === 'w' && data.turn === 'w') || 
+                                         (playerColor === 'b' && data.turn === 'b');
+                         turnIndicator.textContent = isMyTurn ? 'É a sua vez.' : 'Aguardando jogada do oponente...';
+                     } else {
+                         turnIndicator.textContent = 'É a sua vez.';
+                     }
+                 }
+             } else {
+                throw new Error(data.message);
+            }
+        } catch (error) {
+            console.error('Erro:', error);
+            turnIndicator.textContent = error.message || 'Ocorreu um erro.';
+        }
+    }
+
+    // Event listeners para coroação de peão
+    document.querySelectorAll('.promotion-piece').forEach(button => {
+        button.addEventListener('click', function() {
+            const piece = this.dataset.piece;
+            if (pendingPromotion) {
+                document.getElementById('promotion-modal').style.display = 'none';
+                sendMoveToServer(pendingPromotion.startPos, pendingPromotion.endPos, piece);
+                pendingPromotion = null;
+            }
+        });
+    });
+
+    function handleBoardClick(event) {
+        const square = event.target.closest('.square');
+        if (!square) return;
+
+        const row = parseInt(square.dataset.row);
+        const col = parseInt(square.dataset.col);
+
+        if (selectedSquare === null) {
+            const piece = visionBoard[row][col];
+            // Verifica se é uma peça do jogador atual
+            const isPlayerPiece = (playerColor === 'w' && piece.startsWith('w')) || 
+                                 (playerColor === 'b' && piece.startsWith('b'));
+            
+            if (isPlayerPiece) {
+                selectedSquare = { element: square, row: row, col: col };
+                square.classList.add('selected');
+            }
+        } else {
+            const startPos = [selectedSquare.row, selectedSquare.col];
+            const endPos = [row, col];
+            
+            selectedSquare.element.classList.remove('selected');
+            
+            // Verificar se é uma promoção de peão
+            const piece = visionBoard[selectedSquare.row][selectedSquare.col];
+            const isPawn = piece.endsWith('p');
+            const isPromotion = isPawn && ((piece.startsWith('w') && endPos[0] === 0) || (piece.startsWith('b') && endPos[0] === 7));
+            
+            if (isPromotion) {
+                // Mostrar modal de promoção
+                pendingPromotion = { startPos, endPos };
+                document.getElementById('promotion-modal').style.display = 'block';
+                turnIndicator.textContent = 'Escolha uma peça para coroação.';
+            } else {
+                sendMoveToServer(startPos, endPos);
+            }
+            
+            selectedSquare = null;
+        }
+    }
+    
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+    
+    // ===================================================================
+    // SEÇÃO 2.5: SISTEMA DE REVANCHE
+    // ===================================================================
+    
+    function offerRematch() {
+        if (!gameSocket) return;
+        
+        const rematchButton = document.getElementById('rematch-button');
+        const rematchStatus = document.getElementById('rematch-status');
+        
+        rematchButton.disabled = true;
+        rematchButton.textContent = 'Aguardando...';
+        rematchStatus.textContent = 'Oferta de revanche enviada. Aguardando resposta...';
+        
+        gameSocket.send(JSON.stringify({
+            'type': 'offer_rematch'
+        }));
+    }
+    
+    function handleRematchOffer(challengerUsername) {
+        const rematchStatus = document.getElementById('rematch-status');
+        rematchStatus.innerHTML = `
+            <div style="margin-bottom: 10px;">${challengerUsername} ofereceu uma revanche!</div>
+            <button onclick="respondRematch(true)" class="game-over-button" style="margin-right: 10px; padding: 8px 16px; font-size: 0.9em;">Aceitar</button>
+            <button onclick="respondRematch(false)" class="game-over-button exit" style="padding: 8px 16px; font-size: 0.9em;">Recusar</button>
+        `;
+    }
+    
+    function respondRematch(accept) {
+        if (!gameSocket) return;
+        
+        gameSocket.send(JSON.stringify({
+            'type': 'respond_rematch',
+            'accept': accept
+        }));
+        
+        const rematchStatus = document.getElementById('rematch-status');
+        if (accept) {
+            rematchStatus.textContent = 'Revanche aceita! Criando nova partida...';
+        } else {
+            rematchStatus.textContent = 'Revanche recusada.';
+        }
+    }
+    
+    function handleRematchAccepted(newGameId) {
+        // Redirecionar para a nova partida
+        window.location.href = `/game/${newGameId}/`;
+    }
+    
+    function handleRematchDeclined() {
+        const rematchStatus = document.getElementById('rematch-status');
+        rematchStatus.textContent = 'Revanche recusada pelo oponente.';
+        
+        const rematchButton = document.getElementById('rematch-button');
+        rematchButton.disabled = false;
+        rematchButton.textContent = 'Oferecer Revanche';
+    }
+    
+    // ===================================================================
+    // SEÇÃO 2.5: FUNÇÕES DO HISTÓRICO DE MOVIMENTOS
+    // ===================================================================
+    
+    async function loadMoveHistory() {
+        try {
+            const response = await fetch(`/game/${gameId}/history/`);
+            if (response.ok) {
+                const data = await response.json();
+                moveHistory = data.move_history || [];
+                currentMoveIndex = moveHistory.length - 1;
+                
+                if (moveHistory.length > 0) {
+                    setupMoveHistoryPanel();
+                    moveHistoryPanel.style.display = 'block';
+                }
+            }
+        } catch (error) {
+            console.error('Erro ao carregar histórico:', error);
+        }
+    }
+    
+    function setupMoveHistoryPanel() {
+        // Atualizar contadores
+        totalMoves.textContent = moveHistory.length;
+        currentMoveNumber.textContent = currentMoveIndex + 1;
+        
+        // Gerar lista de movimentos
+        generateMoveList();
+        
+        // Configurar event listeners dos botões
+        replayButtons.start.addEventListener('click', () => goToMove(0));
+        replayButtons.prev.addEventListener('click', () => goToMove(currentMoveIndex - 1));
+        replayButtons.next.addEventListener('click', () => goToMove(currentMoveIndex + 1));
+        replayButtons.end.addEventListener('click', () => goToMove(moveHistory.length - 1));
+        
+        updateReplayButtons();
+    }
+    
+    function generateMoveList() {
+        moveList.innerHTML = '';
+        
+        moveHistory.forEach((move, index) => {
+            const moveItem = document.createElement('div');
+            moveItem.className = `move-item ${move.player}`;
+            if (index === currentMoveIndex) {
+                moveItem.classList.add('current');
+            }
+            
+            const pieceSymbol = getPieceSymbol(move.piece);
+            const fromSquare = getSquareNotation(move.from);
+            const toSquare = getSquareNotation(move.to);
+            
+            moveItem.innerHTML = `
+                <strong>${index + 1}.</strong> 
+                ${move.player === 'w' ? '♔' : '♚'} 
+                ${pieceSymbol} ${fromSquare} → ${toSquare}
+                ${move.promotion ? ` (=${getPieceSymbol(move.player + move.promotion)})` : ''}
+            `;
+            
+            moveItem.addEventListener('click', () => goToMove(index));
+            moveList.appendChild(moveItem);
+        });
+    }
+    
+    function goToMove(moveIndex) {
+        if (moveIndex < 0 || moveIndex >= moveHistory.length) return;
+        
+        currentMoveIndex = moveIndex;
+        isReplayMode = true;
+        
+        // Atualizar tabuleiro com o estado do movimento
+        const move = moveHistory[moveIndex];
+        displayBoardState(move.board_state);
+        
+        // Atualizar interface
+        currentMoveNumber.textContent = moveIndex + 1;
+        updateMoveListHighlight();
+        updateReplayButtons();
+    }
+    
+    function displayBoardState(boardState) {
+        // Limpar tabuleiro atual
+        boardElement.innerHTML = '';
+        
+        // Renderizar estado específico do tabuleiro
+        for (let r = 0; r < 8; r++) {
+            for (let c = 0; c < 8; c++) {
+                const square = document.createElement('div');
+                square.className = 'square';
+                square.dataset.row = r;
+                square.dataset.col = c;
+                
+                const isLightSquare = (r + c) % 2 === 0;
+                square.style.backgroundColor = isLightSquare ? colors.visible_light : colors.visible_dark;
+                
+                const piece = boardState[r][c];
+                if (piece !== '--' && pieceImages[piece]) {
+                    const pieceImg = document.createElement('img');
+                    pieceImg.src = pieceImages[piece];
+                    square.appendChild(pieceImg);
+                }
+                
+                boardElement.appendChild(square);
+            }
+        }
+    }
+    
+    function updateMoveListHighlight() {
+        const moveItems = moveList.querySelectorAll('.move-item');
+        moveItems.forEach((item, index) => {
+            item.classList.toggle('current', index === currentMoveIndex);
+        });
+    }
+    
+    function updateReplayButtons() {
+        replayButtons.start.disabled = currentMoveIndex <= 0;
+        replayButtons.prev.disabled = currentMoveIndex <= 0;
+        replayButtons.next.disabled = currentMoveIndex >= moveHistory.length - 1;
+        replayButtons.end.disabled = currentMoveIndex >= moveHistory.length - 1;
+    }
+    
+    function getPieceSymbol(piece) {
+        const symbols = {
+            'wK': '♔', 'wQ': '♕', 'wR': '♖', 'wB': '♗', 'wN': '♘', 'wp': '♙',
+            'bK': '♚', 'bQ': '♛', 'bR': '♜', 'bB': '♝', 'bN': '♞', 'bp': '♟'
+        };
+        return symbols[piece] || piece;
+    }
+    
+    function getSquareNotation(pos) {
+        const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+        return files[pos[1]] + (8 - pos[0]);
+    }
+    
+    // ===================================================================
+    // SEÇÃO 3: INICIALIZAÇÃO DO JOGO
+    // ===================================================================
+    
+    drawBoard();
+    boardElement.addEventListener('click', handleBoardClick);
+    
+    // Inicializar relógios para jogos PvP
+    if (isPvP) {
+        // Buscar dados iniciais do jogo para os relógios
+        fetch(`/game/${gameId}/data/`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    initializeClocks(data.game_data);
+                }
+            })
+            .catch(error => {
+                console.error('Erro ao carregar dados do jogo:', error);
+            });
+    }
+    
+    if (isGameOverInitially) {
+        showGameOver(winnerInitially);
+    }
+    
+    // ===================================================================
+    // SEÇÃO 4: FUNCIONALIDADES DE PGN
+    // ===================================================================
+    
+    let currentPGN = '';
+    
+    function showPGNModal() {
+        fetch(`/game/${gameId}/pgn/`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    currentPGN = data.pgn;
+                    document.getElementById('pgn-content').textContent = data.pgn;
+                    document.getElementById('pgn-modal').style.display = 'block';
+                } else {
+                    alert('Erro ao carregar PGN: ' + data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Erro:', error);
+                alert('Erro ao carregar PGN');
+            });
+    }
+    
+    function closePGNModal() {
+        document.getElementById('pgn-modal').style.display = 'none';
+        // Reset copy button
+        const copyBtn = document.getElementById('copy-pgn-text-btn');
+        copyBtn.textContent = '📋 Copiar PGN';
+        copyBtn.classList.remove('copied');
+    }
+    
+    function copyPGNText() {
+        navigator.clipboard.writeText(currentPGN).then(() => {
+            const copyBtn = document.getElementById('copy-pgn-text-btn');
+            copyBtn.textContent = '✅ Copiado!';
+            copyBtn.classList.add('copied');
+            
+            setTimeout(() => {
+                copyBtn.textContent = '📋 Copiar PGN';
+                copyBtn.classList.remove('copied');
+            }, 2000);
+        }).catch(err => {
+            console.error('Erro ao copiar:', err);
+            alert('Erro ao copiar PGN');
+        });
+    }
+    
+    // Fechar modal clicando fora
+    document.getElementById('pgn-modal').addEventListener('click', function(e) {
+        if (e.target === this) {
+            closePGNModal();
+        }
+    });
+    
+    // ===================================================================
+    // SEÇÃO 5: FUNCIONALIDADES DOS RELÓGIOS DE XADREZ
+    // ===================================================================
+    
+    function formatTime(seconds) {
+        const minutes = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return `${minutes}:${secs.toString().padStart(2, '0')}`;
+    }
+    
+    function updateClockDisplay() {
+        if (isPvP) {
+            const whiteTimeElement = document.getElementById('white-time');
+            const blackTimeElement = document.getElementById('black-time');
+            
+            if (whiteTimeElement && blackTimeElement) {
+                whiteTimeElement.textContent = formatTime(whiteTimeLeft);
+                blackTimeElement.textContent = formatTime(blackTimeLeft);
+                
+                // Destacar o relógio do jogador ativo
+                const whiteClock = document.getElementById('white-clock');
+                const blackClock = document.getElementById('black-clock');
+                
+                if (currentTurn === 'w') {
+                    whiteClock.style.boxShadow = '0 0 10px #4CAF50';
+                    blackClock.style.boxShadow = 'none';
+                } else {
+                    blackClock.style.boxShadow = '0 0 10px #4CAF50';
+                    whiteClock.style.boxShadow = 'none';
+                }
+            }
+        }
+    }
+    
+    function startClock() {
+        if (!isPvP || clockInterval) return;
+        
+        clockInterval = setInterval(() => {
+            if (currentTurn === 'w') {
+                whiteTimeLeft--;
+                if (whiteTimeLeft <= 0) {
+                    whiteTimeLeft = 0;
+                    clearInterval(clockInterval);
+                    // Tempo esgotado para as brancas
+                    showGameOver('b');
+                }
+            } else {
+                blackTimeLeft--;
+                if (blackTimeLeft <= 0) {
+                    blackTimeLeft = 0;
+                    clearInterval(clockInterval);
+                    // Tempo esgotado para as pretas
+                    showGameOver('w');
+                }
+            }
+            updateClockDisplay();
+        }, 1000);
+    }
+    
+    function stopClock() {
+        if (clockInterval) {
+            clearInterval(clockInterval);
+            clockInterval = null;
+        }
+    }
+    
+    function switchTurn() {
+        if (!isPvP) return;
+        
+        // Adicionar incremento ao jogador que acabou de jogar
+        if (currentTurn === 'w') {
+            whiteTimeLeft += timeIncrement;
+            currentTurn = 'b';
+        } else {
+            blackTimeLeft += timeIncrement;
+            currentTurn = 'w';
+        }
+        
+        updateClockDisplay();
+    }
+    
+    function initializeClocks(gameData) {
+        if (!isPvP || !gameData) return;
+        
+        whiteTimeLeft = gameData.white_time_left || 0;
+        blackTimeLeft = gameData.black_time_left || 0;
+        timeIncrement = gameData.time_increment || 0;
+        currentTurn = gameData.turn || 'w';
+        
+        updateClockDisplay();
+        
+        // Iniciar o relógio se o jogo estiver em andamento
+        if (!isGameOverInitially) {
+            startClock();
+        }
+    }
+    
+    // Fechar modal com ESC
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            closePGNModal();
+        }
+    });
+</script>
+{% endblock %}
