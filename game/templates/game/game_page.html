@@ -487,6 +487,11 @@
             <button id="replay-end" class="replay-btn" title="Ir ao final">⏭</button>
         </div>
         
+        <!-- Teste de áudio -->
+        <div style="text-align: center; margin-bottom: 15px;">
+            <button id="test-audio-btn" class="replay-btn" title="Testar sons" onclick="testAudio()" style="background: #4CAF50;">🔊 Testar Som</button>
+        </div>
+        
         <!-- Indicador do movimento atual -->
         <div id="move-indicator" style="text-align: center; color: #ccc; margin-bottom: 10px; font-size: 0.9em;">
             Movimento: <span id="current-move-number">0</span> / <span id="total-moves">0</span>
@@ -598,12 +603,67 @@
     let gameSocket = null;
     
     // Variáveis dos relógios de xadrez
-    let whiteTimeLeft = 0; // em segundos
-    let blackTimeLeft = 0; // em segundos
-    let timeIncrement = 0; // em segundos
+    let whiteTimeLeft = 0;
+    let blackTimeLeft = 0;
+    let timeIncrement = 0;
+    let currentTurn = 'white';
     let clockInterval = null;
-    let currentTurn = 'w'; // 'w' para brancas, 'b' para pretas
     let lastMoveTime = null;
+    
+    // ===================================================================
+    // SISTEMA DE ÁUDIO
+    // ===================================================================
+    
+    // Objetos de áudio para os sons do jogo
+    const gameAudio = {
+        move: new Audio('{% static "sounds/move.mp3" %}'),
+        capture: new Audio('{% static "sounds/capture.mp3" %}'),
+        checkmate: new Audio('{% static "sounds/checkmate.mp3" %}'),
+        gameStart: new Audio('{% static "sounds/game_start.mp3" %}'),
+        invalidMove: new Audio('{% static "sounds/invalid_move.mp3" %}')
+    };
+    
+    // Configurar volume dos sons (0.0 a 1.0)
+    Object.values(gameAudio).forEach(audio => {
+        audio.volume = 0.5;
+        audio.preload = 'auto';
+        audio.load(); // Forçar carregamento
+    });
+    
+    // Função para reproduzir sons
+    function playSound(soundType, forBothPlayers = false) {
+        if (!userInteracted) return;
+        
+        try {
+            const audio = gameAudio[soundType];
+            if (audio && audio.readyState >= 2) { // HAVE_CURRENT_DATA
+                // Clone o áudio para permitir reprodução simultânea
+                const audioClone = audio.cloneNode();
+                audioClone.volume = 0.5;
+                audioClone.play().catch(() => {}); // Silenciar erros
+                
+                // Para jogos PvP, enviar som para o oponente se necessário
+                if (isPvP && forBothPlayers && gameSocket && gameSocket.readyState === WebSocket.OPEN) {
+                    gameSocket.send(JSON.stringify({
+                        'type': 'sound_effect',
+                        'sound': soundType
+                    }));
+                }
+            }
+        } catch (error) {
+            // Silenciar erros de áudio para não impactar performance
+        }
+    }
+    
+    // Função para reproduzir som apenas para o oponente
+    function playSoundForOpponent(soundType) {
+        if (isPvP && gameSocket) {
+            gameSocket.send(JSON.stringify({
+                'type': 'sound_effect',
+                'sound': soundType
+            }));
+        }
+    }
     
     // Conectar WebSocket para jogos PVP
     if (isPvP) {
@@ -648,6 +708,9 @@
                 handleRematchAccepted(data.new_game_id);
             } else if (data.type === 'rematch_declined') {
                 handleRematchDeclined();
+            } else if (data.type === 'sound_effect') {
+                // Reproduzir efeito sonoro recebido do oponente
+                playSound(data.sound);
             }
         };
         
@@ -812,6 +875,19 @@
                 document.getElementById('promotion-modal').style.display = 'block';
                 turnIndicator.textContent = 'Escolha uma peça para coroação.';
             } else if (data.status === 'success') {
+                 // Reproduzir som baseado no tipo de movimento
+                 if (data.captured_piece) {
+                     // Som de captura para o jogador que fez o movimento
+                     playSound('capture');
+                     // Som de movimento para o oponente
+                     playSoundForOpponent('move');
+                 } else {
+                     // Som de movimento para o jogador que fez o movimento
+                     playSound('move');
+                     // Som de movimento para o oponente
+                     playSoundForOpponent('move');
+                 }
+                 
                  visionBoard = data.vision_board;
                  drawBoard();
                  
@@ -846,6 +922,8 @@
                  
                  if (data.is_game_over) {
                      stopClock();
+                     // Som de fim de jogo para ambos os jogadores
+                     playSound('checkmate', true);
                      showGameOver(data.winner);
                  } else {
                      if (isPvP) {
@@ -861,6 +939,8 @@
             }
         } catch (error) {
             console.error('Erro:', error);
+            // Som de movimento inválido
+            playSound('invalidMove');
             turnIndicator.textContent = error.message || 'Ocorreu um erro.';
         }
     }
@@ -1133,6 +1213,26 @@
     drawBoard();
     boardElement.addEventListener('click', handleBoardClick);
     
+    // Som de início de jogo (apenas se o jogo não estiver terminado)
+    // Aguardar interação do usuário antes de reproduzir áudio
+    let userInteracted = false;
+    
+    function enableAudio() {
+        if (!userInteracted) {
+            userInteracted = true;
+            
+            // Reproduzir som de início se o jogo não estiver terminado
+            if (!isGameOverInitially) {
+                setTimeout(() => playSound('gameStart', true), 100);
+            }
+        }
+    }
+    
+    // Detectar primeira interação do usuário
+    document.addEventListener('click', enableAudio, { once: true });
+    document.addEventListener('keydown', enableAudio, { once: true });
+    document.addEventListener('touchstart', enableAudio, { once: true });
+    
     // Inicializar relógios para jogos PvP
     if (isPvP) {
         // Buscar dados iniciais do jogo para os relógios
@@ -1302,6 +1402,22 @@
         if (!isGameOverInitially) {
             startClock();
         }
+    }
+    
+    // Função para testar todos os sons
+    function testAudio() {
+        const soundTypes = ['gameStart', 'move', 'capture', 'checkmate', 'invalidMove'];
+        let currentIndex = 0;
+        
+        function playNextSound() {
+            if (currentIndex < soundTypes.length) {
+                playSound(soundTypes[currentIndex]);
+                currentIndex++;
+                setTimeout(playNextSound, 1000); // Reduzir para 1s
+            }
+        }
+        
+        playNextSound();
     }
     
     // Fechar modal com ESC

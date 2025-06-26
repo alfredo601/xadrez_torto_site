@@ -181,6 +181,9 @@ def make_move_view(request, game_id):
                     'end_pos': end_pos
                 })
 
+            # Verificar se há uma peça na posição de destino (captura)
+            captured_piece = gs.board[end_pos[0]][end_pos[1]] if gs.board[end_pos[0]][end_pos[1]] != '--' else None
+            
             move_was_made = gs.make_move(start_pos, end_pos, promotion_piece)
             
             if not move_was_made:
@@ -284,7 +287,8 @@ def make_move_view(request, game_id):
                 'vision_board': vision_board,
                 'is_game_over': gs.game_over,
                 'winner': gs.winner,
-                'turn': game.turn
+                'turn': game.turn,
+                'captured_piece': captured_piece
             }
             
             # Adicionar informações dos relógios para jogos PvP

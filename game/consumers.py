@@ -381,6 +381,16 @@ class PvPGameConsumer(AsyncWebsocketConsumer):
                     'sender': self.user.username
                 }
             )
+        elif message_type == 'sound_effect':
+            # Retransmitir efeito sonoro para o outro jogador
+            await self.channel_layer.group_send(
+                self.game_group_name,
+                {
+                    'type': 'sound_effect',
+                    'sound': data.get('sound'),
+                    'sender': self.user.username
+                }
+            )
         elif message_type == 'respond_rematch':
             # Processar resposta à revanche
             accept = data.get('accept', False)
@@ -473,6 +483,14 @@ class PvPGameConsumer(AsyncWebsocketConsumer):
         if event['sender'] != self.user.username:
             await self.send(text_data=json.dumps({
                 'type': 'rematch_declined'
+            }))
+    
+    async def sound_effect(self, event):
+        # Não enviar o som de volta para quem o enviou
+        if event['sender'] != self.user.username:
+            await self.send(text_data=json.dumps({
+                'type': 'sound_effect',
+                'sound': event['sound']
             }))
     
     @database_sync_to_async
