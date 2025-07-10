@@ -157,3 +157,26 @@ CHANNEL_LAYERS = {
         "BACKEND": "channels.layers.InMemoryChannelLayer"
     }
 }
+
+# Configuração do Channel Layers
+
+# Pega a URL do Redis das variáveis de ambiente
+REDIS_URL = os.environ.get('REDIS_URL')
+
+if REDIS_URL:
+    # Configuração para produção (Render), usa o Redis
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels_redis.core.RedisChannelLayer",
+            "CONFIG": {
+                "hosts": [REDIS_URL],
+            },
+        },
+    }
+else:
+    # Configuração para desenvolvimento local, usa a memória
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels.layers.InMemoryChannelLayer",
+        },
+    }
