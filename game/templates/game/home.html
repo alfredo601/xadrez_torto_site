@@ -70,9 +70,13 @@
 
     // ================== BLOCO CORRIGIDO ==================
     // Determina o protocolo correto (ws ou wss)
-    const protocol = window.location.protocol === 'https' ? 'wss' : 'ws';
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     // Cria a URL completa e dinâmica
-    const presenceSocketURL = `${protocol}://${window.location.host}/ws/presence/`;
+    const presenceSocketURL = `${protocol}//${window.location.host}/ws/presence/`;
+    
+    console.log('Tentando conectar WebSocket em:', presenceSocketURL);
+    console.log('Protocolo detectado:', protocol);
+    console.log('Host atual:', window.location.host);
     
     // Cria o socket com a URL correta
     const presenceSocket = new WebSocket(presenceSocketURL);
@@ -98,9 +102,21 @@
         }
     };
 
+    // Evento quando a conexão é estabelecida
+    presenceSocket.onopen = function(e) {
+        console.log('WebSocket conectado com sucesso!');
+        onlineUsersPlaceholder.textContent = 'Carregando jogadores online...';
+    };
+
+    // Evento quando há erro na conexão
+    presenceSocket.onerror = function(e) {
+        console.error('Erro no WebSocket:', e);
+        onlineUsersPlaceholder.textContent = 'Erro na conexão WebSocket. Verifique o console.';
+    };
+
     // O que fazer quando a conexão fecha (ex: o servidor reinicia)
     presenceSocket.onclose = function(e) {
-        console.error('Socket de presença fechado inesperadamente');
+        console.error('Socket de presença fechado. Código:', e.code, 'Razão:', e.reason);
         onlineUsersPlaceholder.textContent = 'Conexão perdida. Atualize a página.';
     };
 

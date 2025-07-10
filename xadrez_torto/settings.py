@@ -26,8 +26,8 @@ SECRET_KEY = 'django-insecure-k!$79(sb%@20ukv*svn^1-s6f1rd4gfc2orb^od3*y#%ux!@@%
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
 
-ALLOWED_HOSTS = ['xadreztortobr.pythonanywhere.com', '127.0.0.1', 'localhost', '*']
-CSRF_TRUSTED_ORIGINS = ['https://www.xadreztorto.shop']
+ALLOWED_HOSTS = ['xadreztortobr.pythonanywhere.com', '127.0.0.1', 'localhost', 'www.xadreztorto.shop', 'xadreztorto.shop', '*']
+CSRF_TRUSTED_ORIGINS = ['https://www.xadreztorto.shop', 'https://xadreztorto.shop']
 
 # Application definition
 
@@ -131,6 +131,32 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles') # <--- ADICIONE ESTA LINHA!
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Configuração de logging para debug
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+    },
+    'loggers': {
+        'channels': {
+            'handlers': ['console'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'daphne': {
+            'handlers': ['console'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+    },
+}
 
 # REMOVA ESTA LINHA DUPLICADA:
 # STATIC_URL = 'static/' 

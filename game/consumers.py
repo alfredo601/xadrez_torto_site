@@ -23,28 +23,54 @@ async def get_online_users_data():
     Busca os usuários online combinando dados do banco e cache de forma assíncrona.
     """
     from django.core.cache import cache
+    import logging
+    logger = logging.getLogger(__name__)
     
     # Busca todos os usuários do banco de dados
     all_users = await get_all_users_with_profiles()
+    logger.debug(f"Total de usuários no banco: {len(all_users)}")
     
     # Filtra apenas os usuários online usando cache de forma síncrona
     online_users = []
     for user_data in all_users:
         # Usa database_sync_to_async para operações de cache
         is_online = await database_sync_to_async(cache.get)(f'seen_{user_data["username"]}')
+        logger.debug(f"Usuário {user_data['username']}: online={bool(is_online)}")
         if is_online:
             online_users.append({
                 'username': user_data['username'],
                 'rating': int(user_data['profile__rating'])
             })
     
+    logger.debug(f"Usuários online encontrados: {len(online_users)}")
     return online_users
 
 class PresenceConsumer(AsyncWebsocketConsumer):
     async def connect(self):
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        # Verificar se o usuário está autenticado
+        if self.scope["user"].is_anonymous:
+            logger.warning("Usuário anônimo tentou conectar ao WebSocket de presença")
+            await self.close()
+            return
+            
+        logger.debug(f"Usuário {self.scope['user'].username} conectando ao WebSocket de presença")
+        
         self.room_group_name = 'presence'
         await self.channel_layer.group_add(self.room_group_name, self.channel_name)
         await self.accept()
+        
+        # Marcar usuário como online no cache
+        from django.core.cache import cache
+        from django.utils import timezone
+        await database_sync_to_async(cache.set)(
+            f'seen_{self.scope["user"].username}', 
+            timezone.now(), 
+            timeout=300
+        )
+        
         await self.broadcast_user_list()
 
     async def disconnect(self, close_code):
@@ -279,7 +305,12 @@ class PresenceConsumer(AsyncWebsocketConsumer):
         """
         Função auxiliar que busca os dados e os transmite para o grupo.
         """
+        import logging
+        logger = logging.getLogger(__name__)
+        
         users = await get_online_users_data()
+        logger.debug(f"Broadcasting lista de usuários: {users}")
+        
         await self.channel_layer.group_send(
             self.room_group_name,
             {
@@ -287,6 +318,7 @@ class PresenceConsumer(AsyncWebsocketConsumer):
                 "data": {"type": "online_users_list", "users": users},
             },
         )
+        logger.debug("Lista de usuários enviada para o grupo")
     
     # --- MÉTODO FALTANTE ADICIONADO AQUI ---
     async def user_joined(self, event):
