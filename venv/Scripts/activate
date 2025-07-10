@@ -38,7 +38,7 @@ deactivate () {
 # unset irrelevant variables
 deactivate nondestructive
 
-VIRTUAL_ENV="C:\Users\Casa\Documents\My_workspace\xadrez_torto_site\venv"
+VIRTUAL_ENV="C:\Users\Casa\Documents\My_workspace\Xadrez_torto_Github\xadrez_torto_site\venv"
 export VIRTUAL_ENV
 
 _OLD_VIRTUAL_PATH="$PATH"
