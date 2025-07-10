@@ -8,3 +8,5 @@ db.sqlite3
 # Ignorar arquivos de cache do Python
 __pycache__/
 *.pyc
+
+Forçando atualização em 10/07/2025
