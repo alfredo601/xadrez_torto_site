@@ -82,7 +82,7 @@ DATABASES = {
     'default': dj_database_url.config(
         # Se a variável de ambiente DATABASE_URL não for encontrada, ele usará o sqlite3
         default='sqlite:///db.sqlite3',
-        conn_max_age=600
+        conn_max_age=0
     )
 }
 
