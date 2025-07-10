@@ -70,10 +70,13 @@
     const onlineUsersPlaceholder = document.getElementById('online-users-placeholder');
     const currentUser = "{{ user.username }}";
 
-    // Cria a conexão WebSocket
-    const presenceSocket = new WebSocket(
-        'ws://' + window.location.host + '/ws/presence/'
-    );
+    // Determina o protocolo correto (ws ou wss)
+    const protocol = window.location.protocol === 'https' ? 'wss' : 'ws';
+    // Cria a URL completa e dinâmica
+    const presenceSocketURL = `${protocol}://${window.location.host}/ws/presence/`;
+    
+    // Cria o socket com a URL correta
+    const presenceSocket = new WebSocket(presenceSocketURL);
 
     // O que fazer quando uma mensagem chega do servidor
     presenceSocket.onmessage = function(e) {
