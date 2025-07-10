@@ -24,10 +24,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-k!$79(sb%@20ukv*svn^1-s6f1rd4gfc2orb^od3*y#%ux!@@%'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
 ALLOWED_HOSTS = ['xadreztortobr.pythonanywhere.com', '127.0.0.1', 'localhost', '*']
-
+CSRF_TRUSTED_ORIGINS = ['https://www.xadreztorto.shop']
 
 # Application definition
 
