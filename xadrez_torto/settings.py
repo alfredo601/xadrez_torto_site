@@ -13,6 +13,14 @@ import dj_database_url
 from pathlib import Path
 import os
 
+# Carregar variáveis de ambiente do arquivo .env
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    # Se python-dotenv não estiver instalado, continua sem ele
+    pass
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -21,12 +29,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-k!$79(sb%@20ukv*svn^1-s6f1rd4gfc2orb^od3*y#%ux!@@%'
+SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-k!$79(sb%@20ukv*svn^1-s6f1rd4gfc2orb^od3*y#%ux!@@%')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = os.environ.get('DEBUG', 'False').lower() == 'true'
 
-ALLOWED_HOSTS = ['xadreztortobr.pythonanywhere.com', '127.0.0.1', 'localhost', 'www.xadreztorto.shop', 'xadreztorto.shop', '*']
+ALLOWED_HOSTS = ['xadreztortobr.pythonanywhere.com', '127.0.0.1', 'localhost', 'www.xadreztorto.shop', 'xadreztorto.shop', '82.25.65.2', '*']
 CSRF_TRUSTED_ORIGINS = ['https://www.xadreztorto.shop', 'https://xadreztorto.shop']
 
 # Application definition
